@@ -55,7 +55,8 @@ class TcpHandler(
     private val onWebSocket: (String) -> Unit = {},
     private val onClanRounds: (Int) -> Unit = {},
     private val onBattleSeq: (Int) -> Unit = {},
-    private val onGemStatus: (String) -> Unit = {}
+    private val onGemStatus: (String) -> Unit = {},
+    private val onGemCycles: (Int) -> Unit = {}
 ) {
     private val connections = ConcurrentHashMap<String, TcpConnState>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -116,40 +117,48 @@ class TcpHandler(
     }
 
     // ── Gem loop ──────────────────────────────────────────────────────────
-    // When armed, the next outbound use_free_offer packet is intercepted,
-    // its counter is captured, the real packet is dropped, and a loop
-    // sends crafted use_free_offer packets (counter N, N+1, N+2 …) until
-    // disarmed.  Each iteration waits 2 s and checks inbound response size:
-    // a valid server response is ~618 bytes; errors are much smaller.
-    private val gemLoopArmed  = java.util.concurrent.atomic.AtomicBoolean(false)
-    private val gemLoopCounter = java.util.concurrent.atomic.AtomicInteger(1)
+    // Flow: ARM → immediately locate SF3 connection → block all outbound
+    // use_free_offer from the app (handleAck drops them) → send crafted
+    // packet → wait for server response → verify response size > 200B
+    // (valid ≈ 618B compressed; error packets are < 50B) → increment
+    // cycle counter → repeat until disarmed.
+    // DISARM: flag cleared → handleAck intercept stops → app traffic
+    // flows normally again.
+    private val gemLoopArmed      = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val gemLoopCounter    = java.util.concurrent.atomic.AtomicInteger(1)
+    private val gemCycleCount     = java.util.concurrent.atomic.AtomicInteger(0)
     private val gemResponseSizeMax = java.util.concurrent.atomic.AtomicInteger(-1)
-    @Volatile private var gemLoopConnKey: String? = null
     @Volatile private var gemLoopJob: kotlinx.coroutines.Job? = null
 
-    private val GEM_MIN_VALID_RESPONSE = 200  // server sends ~618B compressed; error << 200B
+    // Minimum compressed response size to treat as "server accepted".
+    // Successful use_free_offer response: ~618B compressed (977B decompressed).
+    // Error/reject responses are tiny (< ~50B).
+    private val GEM_MIN_VALID_RESPONSE = 200
 
+    /**
+     * Arm the gem loop.  Immediately finds the game connection and begins
+     * sending use_free_offer requests.  Any real use_free_offer the app
+     * tries to send while the loop is active is silently dropped.
+     */
     fun armGemLoop() {
+        gemLoopCounter.set(1)
+        gemCycleCount.set(0)
         gemLoopArmed.set(true)
-        gemLoopConnKey = null   // will be set once we intercept the first use_free_offer
-        onGemStatus("WAITING — tap the free offer in-game to start the loop")
+        onGemStatus("ARMED — locating game connection…")
+        onGemCycles(0)
+        startGemLoop()
     }
 
+    /**
+     * Disarm the gem loop and unblock the app.  Setting gemLoopArmed=false
+     * causes the handleAck intercept to stop dropping use_free_offer packets,
+     * so the app's own traffic resumes immediately.
+     */
     fun disarmGemLoop() {
         gemLoopArmed.set(false)
         gemLoopJob?.cancel()
         gemLoopJob = null
-        onGemStatus("DISARMED")
-    }
-
-    private fun extractUseFreeOfferCounter(frame: ByteArray): Int? {
-        return try {
-            val proto = GameProtocolParser.extractPayload(frame) ?: return null
-            val fields = GameProtocolParser.readProtoFields(proto)
-            val paramsBytes = fields[3] as? ByteArray ?: return null
-            val paramsFields = GameProtocolParser.readProtoFields(paramsBytes)
-            (paramsFields[1] as? Long)?.toInt()
-        } catch (_: Exception) { null }
+        onGemStatus("DISARMED — app traffic unblocked")
     }
 
     private fun buildUseFreeOfferPacket(counter: Int): ByteArray {
@@ -170,44 +179,79 @@ class TcpHandler(
         return if (payload.size <= 255) {
             byteArrayOf(0x01, payload.size.toByte()) + payload
         } else {
-            // Shouldn't happen for this command — fall back to compressed frame
             val def = java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true)
             def.setInput(payload); def.finish()
             val buf = ByteArray(payload.size + 64); val n = def.deflate(buf); def.end()
             val comp = buf.copyOf(n)
-            val lenBuf = java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(payload.size).array()
+            val lenBuf = java.nio.ByteBuffer.allocate(4)
+                .order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(payload.size).array()
             byteArrayOf(0x02) + lenBuf + comp
         }
     }
 
-    private fun startGemLoop(connKey: String) {
+    private fun startGemLoop() {
         gemLoopJob?.cancel()
         gemLoopJob = scope.launch {
+
+            // ── Step 0: locate ESTABLISHED non-WS SF3 connection (retry 10 s) ──
+            var connId: String? = null
+            var waited = 0
+            while (connId == null && waited < 10_000 && gemLoopArmed.get()) {
+                connId = connections.values
+                    .firstOrNull { it.status == TcpStatus.ESTABLISHED && !it.isWebSocket }
+                    ?.connId
+                if (connId == null) { kotlinx.coroutines.delay(500); waited += 500 }
+            }
+            if (connId == null || !gemLoopArmed.get()) {
+                if (gemLoopArmed.get()) {
+                    onGemStatus("STOPPED — no SF3 connection (open the game first)")
+                    gemLoopArmed.set(false)
+                }
+                return@launch
+            }
+
             var counter = gemLoopCounter.get()
-            onGemStatus("RUNNING — counter=$counter")
+            onGemStatus("RUNNING — req #$counter | app use_free_offer BLOCKED")
+
             while (gemLoopArmed.get()) {
+
+                // ── Step 1: BUILD packet with current counter ─────────────
                 val packet = buildUseFreeOfferPacket(counter)
+
+                // ── Step 2: SEND it (app's own packets are dropped by handleAck) ──
                 gemResponseSizeMax.set(-1)
-                val result = injectDirect(connKey, packet)
+                val result = injectDirect(connId, packet)
                 if (result.startsWith("FAIL")) {
-                    onGemStatus("STOPPED — inject failed: $result")
+                    onGemStatus("STOPPED — connection lost: $result")
                     gemLoopArmed.set(false)
                     break
                 }
-                kotlinx.coroutines.delay(2_000)
+
+                // ── Step 3: WAIT for server response ──────────────────────
+                kotlinx.coroutines.delay(2_500)
+
+                // ── Step 4: VERIFY server accepted (response must be > 200B) ──
                 val maxSize = gemResponseSizeMax.getAndSet(-1)
-                if (!gemLoopArmed.get()) break
+                if (!gemLoopArmed.get()) break      // disarmed while waiting
+
                 if (maxSize < GEM_MIN_VALID_RESPONSE) {
-                    onGemStatus("STOPPED — server rejected (response=${maxSize}B < ${GEM_MIN_VALID_RESPONSE}B)")
+                    onGemStatus("STOPPED — server rejected (got ${maxSize}B, need >${GEM_MIN_VALID_RESPONSE}B) | app UNBLOCKED")
                     gemLoopArmed.set(false)
                     break
                 }
-                onGemStatus("✓ counter=$counter  resp=${maxSize}B")
+
+                // ── Step 5: SUCCESS — update cycle count and loop ─────────
+                val cycles = gemCycleCount.incrementAndGet()
+                onGemCycles(cycles)
+                onGemStatus("✓ cycle $cycles | req #$counter | resp ${maxSize}B | app BLOCKED")
+
                 counter++
                 gemLoopCounter.set(counter)
-                kotlinx.coroutines.delay(500)
+                kotlinx.coroutines.delay(300)   // brief breath before next request
             }
-            if (gemLoopArmed.get()) onGemStatus("DONE — counter=$counter")
+
+            // Loop exited — gemLoopArmed is now false → app traffic unblocked
+            onGemStatus("DONE — ${gemCycleCount.get()} cycles | app traffic UNBLOCKED")
         }
     }
 
@@ -417,19 +461,16 @@ class TcpHandler(
                 }
             }
 
-            // ── Gem loop intercept ────────────────────────────────────────────
-            // When armed, drop the app's own use_free_offer, capture its counter,
-            // log it (so the user sees it was intercepted), then start the loop.
+            // ── Gem loop: block app's use_free_offer while loop is active ────
+            // We DROP any real use_free_offer the app sends so it doesn't
+            // race with or duplicate our crafted loop packets.  The loop
+            // itself is already running (started in armGemLoop); we do NOT
+            // restart it here.  We still log the intercepted packet so the
+            // dev-mode log shows it was blocked.
             if (gemLoopArmed.get() && extractCommandName(payloadForServer) == "use_free_offer") {
-                val counter = extractUseFreeOfferCounter(payloadForServer) ?: 1
-                gemLoopCounter.set(counter)
-                gemLoopConnKey = connKey
-                // Log the intercepted packet but do NOT forward it to the server
                 conn.outboundSf3Buffer.write(payloadForServer)
                 parseSf3Frames(conn.connId, conn.outboundSf3Buffer, LiveMessage.Direction.OUTBOUND)
-                onGemStatus("INTERCEPTED counter=$counter — loop starting")
-                startGemLoop(connKey)
-                return
+                return  // DROP — do not forward to server
             }
 
             // Buffer and reassemble SF3 frames — large packets (e.g. get_player at 9 KB

@@ -422,6 +422,19 @@
                 android:layout_marginTop="8dp"
                 android:visibility="gone" />
 
+            <TextView
+                android:id="@+id/tv_gem_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="💎 15 × 0"
+                android:textColor="#FFD29922"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+
         </LinearLayout>
 
         <!-- ── User Mode Panel (user mode only, gone by default) ── -->

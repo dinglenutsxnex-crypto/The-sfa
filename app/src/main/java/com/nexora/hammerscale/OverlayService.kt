@@ -206,6 +206,17 @@ class OverlayService : Service() {
         if (msg != null) updateGemsPanel(null)
     }
 
+    private val gemCyclesObserver = Observer<Int> { cycles ->
+        val v  = overlayView ?: return@Observer
+        val tv = v.findViewById<TextView>(R.id.tv_gem_count) ?: return@Observer
+        if (cycles > 0) {
+            tv.text = "💎 15 × $cycles  =  ${15 * cycles} gems"
+            tv.visibility = View.VISIBLE
+        } else {
+            tv.visibility = View.GONE
+        }
+    }
+
     // ── Game events observer (used to detect battle type for user-mode labels) ──
     private val gameEventsForTypeObserver = Observer<List<GameEvent>> { list ->
         val last = list.lastOrNull()
@@ -435,6 +446,10 @@ class OverlayService : Service() {
         gemLoopIsArmed = false
         TrafficVpnService.instance?.disarmGemLoop()
         AppState.viewModel.clearGemStatus()
+        AppState.viewModel.resetGemCycles()
+        // Hide gem count display on disarm
+        overlayView?.findViewById<android.widget.TextView>(R.id.tv_gem_count)
+            ?.visibility = View.GONE
         updateGemsPanel(null)
     }
 
@@ -634,6 +649,7 @@ class OverlayService : Service() {
         AppState.viewModel.battleSeq.observeForever(battleSeqObserver)
         AppState.viewModel.raidFightActive.observeForever(raidFightObserver)
         AppState.viewModel.gemLoopStatus.observeForever(gemStatusObserver)
+        AppState.viewModel.gemCycleCount.observeForever(gemCyclesObserver)
 
         BattleConfig.loadAsync(
             resources,
@@ -1112,6 +1128,7 @@ class OverlayService : Service() {
         AppState.viewModel.battleSeq.removeObserver(battleSeqObserver)
         AppState.viewModel.raidFightActive.removeObserver(raidFightObserver)
         AppState.viewModel.gemLoopStatus.removeObserver(gemStatusObserver)
+        AppState.viewModel.gemCycleCount.removeObserver(gemCyclesObserver)
         pendingArmJob?.cancel()
         pendingBrawlerArmJob?.cancel()
         serviceScope.cancel()

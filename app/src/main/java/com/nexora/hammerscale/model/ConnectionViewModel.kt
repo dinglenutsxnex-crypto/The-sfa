@@ -59,6 +59,11 @@ class ConnectionViewModel : ViewModel() {
     fun setGemStatus(msg: String) { _gemLoopStatus.postValue(msg) }
     fun clearGemStatus()          { _gemLoopStatus.postValue(null) }
 
+    private val _gemCycleCount = MutableLiveData(0)
+    val gemCycleCount: LiveData<Int> = _gemCycleCount
+    fun setGemCycles(n: Int)  { _gemCycleCount.postValue(n) }
+    fun resetGemCycles()      { _gemCycleCount.postValue(0) }
+
     // Sub-battle sequence index from the server's inbound event_battle_start_fight response.
     // 0 = first fight (field[3] absent), N = Nth fight (0-indexed). Null until first sniff.
     // Reset on clearAll() and on each new BattleStarted so stale values don't persist.
