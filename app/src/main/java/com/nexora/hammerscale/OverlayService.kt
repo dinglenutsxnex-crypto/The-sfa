@@ -83,6 +83,8 @@ class OverlayService : Service() {
     private var userClanBattleEnabled  = false
     private var userRaidEnabled        = false
     private var userBrawlerEnabled     = false
+    private var userGemsEnabled        = false
+    private var gemLoopIsArmed         = false
 
     // Normal label color for user-mode toggles
     private val labelColorNormal = Color.parseColor("#FFE6EDF3")
@@ -198,6 +200,10 @@ class OverlayService : Service() {
         } else if (!active && wasArmed && isUserMode) {
             flashLabelGreen(R.id.tv_label_raid)
         }
+    }
+
+    private val gemStatusObserver = Observer<String?> { msg ->
+        if (msg != null) updateGemsPanel(null)
     }
 
     // ── Game events observer (used to detect battle type for user-mode labels) ──
@@ -413,6 +419,54 @@ class OverlayService : Service() {
         updateBrawlerPanel()
     }
 
+    private fun armGemLoop() {
+        if (gemLoopIsArmed) return
+        val vpn = TrafficVpnService.instance ?: run {
+            updateGemsPanel("✗ VPN not running")
+            return
+        }
+        gemLoopIsArmed = true
+        vpn.armGemLoop()
+        updateGemsPanel(null)
+    }
+
+    private fun disarmGemLoop() {
+        if (!gemLoopIsArmed) return
+        gemLoopIsArmed = false
+        TrafficVpnService.instance?.disarmGemLoop()
+        AppState.viewModel.clearGemStatus()
+        updateGemsPanel(null)
+    }
+
+    private fun updateGemsPanel(overrideMsg: String?) {
+        val v   = overlayView ?: return
+        val btn = v.findViewById<TextView>(R.id.btn_gem_loop)       ?: return
+        val st  = v.findViewById<TextView>(R.id.tv_gem_loop_status) ?: return
+        val hdr = v.findViewById<TextView>(R.id.tv_gems_status)     ?: return
+
+        if (gemLoopIsArmed) {
+            hdr.text = "GEM LOOP ARMED"
+            hdr.setTextColor(Color.parseColor("#FF3FB950"))
+            btn.text = "⚡ DISARM GEM LOOP"
+            btn.setBackgroundColor(Color.parseColor("#FFDA3633"))
+            btn.setTextColor(Color.parseColor("#FFFFFFFF"))
+        } else {
+            hdr.text = "GEM LOOP INACTIVE"
+            hdr.setTextColor(Color.parseColor("#FF8B949E"))
+            btn.text = "ARM GEM LOOP"
+            btn.setBackgroundColor(Color.parseColor("#FF3FB950"))
+            btn.setTextColor(Color.parseColor("#FF0D1117"))
+        }
+
+        val msg = overrideMsg ?: AppState.viewModel.gemLoopStatus.value
+        if (msg != null) {
+            st.text = msg
+            st.visibility = View.VISIBLE
+        } else {
+            st.visibility = View.GONE
+        }
+    }
+
     // ── Green flash helper (user-mode server-confirm feedback) ────────────
     private fun flashLabelGreen(labelResId: Int) {
         val tv = overlayView?.findViewById<TextView>(labelResId) ?: return
@@ -579,7 +633,8 @@ class OverlayService : Service() {
         AppState.viewModel.clanRounds.observeForever(clanRoundsObserver)
         AppState.viewModel.battleSeq.observeForever(battleSeqObserver)
         AppState.viewModel.raidFightActive.observeForever(raidFightObserver)
-        
+        AppState.viewModel.gemLoopStatus.observeForever(gemStatusObserver)
+
         BattleConfig.loadAsync(
             resources,
             onLoaded = { count, version ->
@@ -813,11 +868,13 @@ class OverlayService : Service() {
         val swClan    = view.findViewById<Switch>(R.id.sw_clan_battle)
         val swRaid    = view.findViewById<Switch>(R.id.sw_raid)
         val swBrawler = view.findViewById<Switch>(R.id.sw_brawler)
+        val swGems    = view.findViewById<Switch>(R.id.sw_gems)
 
         styleSwitch(swEvent)
         styleSwitch(swClan)
         styleSwitch(swRaid)
         styleSwitch(swBrawler)
+        swGems?.let { styleSwitch(it) }
 
         // Restore session state BEFORE attaching listeners so setting isChecked
         // doesn't fire the callbacks and trigger spurious arm/disarm calls.
@@ -825,6 +882,7 @@ class OverlayService : Service() {
         swClan.isChecked    = userClanBattleEnabled
         swRaid.isChecked    = userRaidEnabled
         swBrawler.isChecked = userBrawlerEnabled
+        swGems?.isChecked   = userGemsEnabled
 
         swEvent.setOnCheckedChangeListener { _, checked ->
             userEventBattleEnabled = checked
@@ -883,6 +941,11 @@ class OverlayService : Service() {
             }
         }
 
+        swGems?.setOnCheckedChangeListener { _, checked ->
+            userGemsEnabled = checked
+            if (checked) armGemLoop() else disarmGemLoop()
+        }
+
         // ── Row click handlers for user mode toggles ─────────────────────
         view.findViewById<View>(R.id.row_event_battle)?.setOnClickListener {
             swEvent.isChecked = !swEvent.isChecked
@@ -895,6 +958,9 @@ class OverlayService : Service() {
         }
         view.findViewById<View>(R.id.row_brawler)?.setOnClickListener {
             swBrawler.isChecked = !swBrawler.isChecked
+        }
+        view.findViewById<View>(R.id.row_gems)?.setOnClickListener {
+            swGems?.isChecked = !(swGems?.isChecked ?: false)
         }
 
         // ── ARM BRAWLER WIN button (dev mode brawler intercept) ──────────
@@ -910,13 +976,21 @@ class OverlayService : Service() {
             if (brawlerInterceptArmed) disarmBrawlerIntercept() else armBrawlerIntercept()
         }
 
+        // ── ARM GEM LOOP button (dev mode, always visible for SF3) ───────
+        view.findViewById<TextView>(R.id.btn_gem_loop)?.apply {
+            visibility = View.VISIBLE
+            setOnClickListener {
+                if (gemLoopIsArmed) disarmGemLoop() else armGemLoop()
+            }
+        }
+
         // Show which game is being monitored in the header
         view.findViewById<TextView>(R.id.tv_overlay_game_label)?.text =
             AppState.currentGame.shortName
 
         // For SFA, hide all SF3-specific user-mode toggle rows (empty panel by design)
         if (AppState.currentGame == GameMode.SFA) {
-            listOf(R.id.row_event_battle, R.id.row_clan_battle, R.id.row_raid, R.id.row_brawler)
+            listOf(R.id.row_event_battle, R.id.row_clan_battle, R.id.row_raid, R.id.row_brawler, R.id.row_gems)
                 .forEach { view.findViewById<View>(it)?.visibility = View.GONE }
         }
 
@@ -1037,6 +1111,7 @@ class OverlayService : Service() {
         AppState.viewModel.clanRounds.removeObserver(clanRoundsObserver)
         AppState.viewModel.battleSeq.removeObserver(battleSeqObserver)
         AppState.viewModel.raidFightActive.removeObserver(raidFightObserver)
+        AppState.viewModel.gemLoopStatus.removeObserver(gemStatusObserver)
         pendingArmJob?.cancel()
         pendingBrawlerArmJob?.cancel()
         serviceScope.cancel()
