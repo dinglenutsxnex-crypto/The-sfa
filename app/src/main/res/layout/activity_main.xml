@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_primary">
 
-    <!-- Main content -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -56,25 +54,120 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Start VPN and launch SF3"
+            android:text="Select a game to monitor"
             android:textColor="@color/text_secondary"
-            android:textSize="16sp"
+            android:textSize="13sp"
             android:fontFamily="monospace"
-            android:textStyle="bold"
-            android:letterSpacing="0.1"
-            android:layout_marginTop="12dp" />
+            android:letterSpacing="0.08"
+            android:layout_marginTop="8dp" />
 
-        <!-- Play Button -->
-        <ImageButton
-            android:id="@+id/btn_play"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_marginTop="40dp"
-            android:background="@drawable/btn_play_bg"
-            android:src="@drawable/ic_play"
-            android:scaleType="centerInside"
-            android:padding="30dp"
-            android:contentDescription="Start VPN and launch game" />
+        <!-- ── SF3 Card ─────────────────────────────────────── -->
+        <LinearLayout
+            android:id="@+id/card_sf3"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/game_card_bg"
+            android:paddingStart="20dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="18dp"
+            android:layout_marginTop="40dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SHADOW FIGHT 3"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:fontFamily="monospace"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tv_sf3_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="idle"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginTop="3dp" />
+
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btn_play_sf3"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/btn_play_bg"
+                android:src="@drawable/ic_play"
+                android:scaleType="centerInside"
+                android:padding="14dp"
+                android:contentDescription="Start SF3" />
+
+        </LinearLayout>
+
+        <!-- ── SFA Card ─────────────────────────────────────── -->
+        <LinearLayout
+            android:id="@+id/card_sfa"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/game_card_bg"
+            android:paddingStart="20dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="18dp"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SHADOW FIGHT ARENA"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:fontFamily="monospace"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tv_sfa_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="idle"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginTop="3dp" />
+
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btn_play_sfa"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/btn_play_bg"
+                android:src="@drawable/ic_play"
+                android:scaleType="centerInside"
+                android:padding="14dp"
+                android:contentDescription="Start SFA" />
+
+        </LinearLayout>
 
         <!-- Footer -->
         <LinearLayout
@@ -82,14 +175,14 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center"
-            android:layout_marginTop="60dp">
+            android:layout_marginTop="56dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Made by Nexora · "
                 android:textColor="@color/text_secondary"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:fontFamily="monospace"
                 android:letterSpacing="0.1" />
 
@@ -99,7 +192,7 @@
                 android:layout_height="wrap_content"
                 android:text="Discord"
                 android:textColor="#FF8957E5"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:fontFamily="monospace"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"

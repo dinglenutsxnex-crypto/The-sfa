@@ -22,7 +22,6 @@ class TrafficVpnService : VpnService() {
     companion object {
         const val ACTION_START = "com.nexora.hammerscale.START_VPN"
         const val ACTION_STOP  = "com.nexora.hammerscale.STOP_VPN"
-        const val TARGET_PACKAGE = "com.nekki.shadowfight3"
         const val CHANNEL_ID = "hammerscale_vpn"
         const val NOTIF_ID = 1001
         const val VPN_ADDRESS = "10.0.0.1"
@@ -64,8 +63,9 @@ class TrafficVpnService : VpnService() {
                 .setMtu(1500)
 
             // Only capture traffic from the target app
+            val targetPackage = AppState.currentGame.packageName
             try {
-                builder.addAllowedApplication(TARGET_PACKAGE)
+                builder.addAllowedApplication(targetPackage)
             } catch (e: Exception) {
                 // Target app not installed - still monitor all traffic
             }
@@ -288,7 +288,7 @@ class TrafficVpnService : VpnService() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("HAMMERSCALE Active")
-            .setContentText("Monitoring: $TARGET_PACKAGE")
+            .setContentText("Monitoring: ${AppState.currentGame.shortName}")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(openIntent)
             .addAction(android.R.drawable.ic_delete, "Stop", stopPending)

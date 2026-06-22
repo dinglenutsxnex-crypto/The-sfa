@@ -910,6 +910,16 @@ class OverlayService : Service() {
             if (brawlerInterceptArmed) disarmBrawlerIntercept() else armBrawlerIntercept()
         }
 
+        // Show which game is being monitored in the header
+        view.findViewById<TextView>(R.id.tv_overlay_game_label)?.text =
+            AppState.currentGame.shortName
+
+        // For SFA, hide all SF3-specific user-mode toggle rows (empty panel by design)
+        if (AppState.currentGame == GameMode.SFA) {
+            listOf(R.id.row_event_battle, R.id.row_clan_battle, R.id.row_raid, R.id.row_brawler)
+                .forEach { view.findViewById<View>(it)?.visibility = View.GONE }
+        }
+
         // Apply initial mode state
         applyMode(view)
 
