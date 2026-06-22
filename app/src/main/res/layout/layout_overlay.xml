@@ -374,67 +374,6 @@
                 android:layout_marginTop="8dp"
                 android:visibility="gone" />
 
-            <!-- ── Divider ── -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#FF30363D"
-                android:layout_marginTop="16dp" />
-
-            <!-- ── Gems section ── -->
-            <TextView
-                android:id="@+id/tv_gems_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="GEM LOOP INACTIVE"
-                android:textColor="#FF8B949E"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:layout_marginTop="14dp"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:id="@+id/btn_gem_loop"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="ARM GEM LOOP"
-                android:textColor="#FF0D1117"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:background="#FF3FB950"
-                android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tv_gem_loop_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#FF3FB950"
-                android:textSize="10sp"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:layout_marginTop="8dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tv_gem_count"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="💎 15 × 0"
-                android:textColor="#FFD29922"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace"
-                android:gravity="center"
-                android:layout_marginTop="6dp"
-                android:visibility="gone" />
-
         </LinearLayout>
 
         <!-- ── User Mode Panel (user mode only, gone by default) ── -->
@@ -574,40 +513,6 @@
 
                 <Switch
                     android:id="@+id/sw_raid"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="false" />
-
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#FF21262D" />
-
-            <!-- Get Gems (SF3 only) -->
-            <LinearLayout
-                android:id="@+id/row_gems"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?android:attr/selectableItemBackground">
-
-                <TextView
-                    android:id="@+id/tv_label_gems"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Get Gems"
-                    android:textColor="#FFE6EDF3"
-                    android:textSize="13sp"
-                    android:fontFamily="monospace" />
-
-                <Switch
-                    android:id="@+id/sw_gems"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:checked="false" />

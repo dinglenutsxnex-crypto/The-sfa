@@ -83,9 +83,7 @@ class TrafficVpnService : VpnService() {
                 },
                 onWebSocket = { id -> viewModel.markAsWebSocket(id) },
                 onClanRounds = { rounds -> viewModel.setClanRounds(rounds) },
-                onBattleSeq = { seq -> viewModel.setBattleSeq(seq) },
-                onGemStatus  = { msg -> viewModel.setGemStatus(msg) },
-                onGemCycles  = { n   -> viewModel.setGemCycles(n)  }
+                onBattleSeq = { seq -> viewModel.setBattleSeq(seq) }
             )
 
             udpHandler = UdpHandler(
@@ -236,12 +234,6 @@ class TrafficVpnService : VpnService() {
 
     /** Cancel a previously armed brawler intercept without firing it. */
     fun disarmBrawlerIntercept() { tcpHandler?.disarmBrawlerIntercept() }
-
-    /** Arm the gem loop — intercepts the next use_free_offer and starts a send loop. */
-    fun armGemLoop()   { tcpHandler?.armGemLoop() }
-
-    /** Disarm and stop the gem loop. */
-    fun disarmGemLoop() { tcpHandler?.disarmGemLoop() }
 
     fun stopVpn() {
         captureJob?.cancel()
