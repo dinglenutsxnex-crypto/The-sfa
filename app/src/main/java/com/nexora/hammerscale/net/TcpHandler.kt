@@ -54,7 +54,8 @@ class TcpHandler(
     private val onStatusChange: (String, ConnectionStatus) -> Unit,
     private val onWebSocket: (String) -> Unit = {},
     private val onClanRounds: (Int) -> Unit = {},
-    private val onBattleSeq: (Int) -> Unit = {}
+    private val onBattleSeq: (Int) -> Unit = {},
+    private val onOfflineBatch: (counter: Long, orderId: Long) -> Unit = { _, _ -> }
 ) {
     private val connections = ConcurrentHashMap<String, TcpConnState>()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -157,6 +158,16 @@ class TcpHandler(
     private fun sniffEventBattleStart(frame: ByteArray) {
         val seq = GameProtocolParser.extractBattleSeqFromServerStart(frame) ?: return
         onBattleSeq(seq)
+    }
+
+    /**
+     * Called for every INBOUND frame. If the server has pushed a process_offline_batch
+     * notification, extracts (counter, orderId) and reports via [onOfflineBatch] so the
+     * overlay button can replay the client-side acceptance packet.
+     */
+    private fun sniffOfflineBatch(frame: ByteArray) {
+        val (counter, orderId) = GameProtocolParser.extractOfflineBatchPush(frame) ?: return
+        onOfflineBatch(counter, orderId)
     }
 
     fun handlePacket(packet: ParsedPacket) {
@@ -575,6 +586,7 @@ class TcpHandler(
                     if (dir == LiveMessage.Direction.INBOUND) {
                         sniffClanStart(frame01)
                         sniffEventBattleStart(frame01)
+                        sniffOfflineBatch(frame01)
                     }
                     pos += 2 + len
                 }
@@ -603,6 +615,7 @@ class TcpHandler(
                             if (dir == LiveMessage.Direction.INBOUND) {
                                 sniffClanStart(frame02)
                                 sniffEventBattleStart(frame02)
+                                sniffOfflineBatch(frame02)
                             }
                             pos += 5 + compLen
                         }

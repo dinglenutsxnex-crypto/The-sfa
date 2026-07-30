@@ -591,6 +591,24 @@
                 android:layout_height="1dp"
                 android:background="#FF30363D" />
 
+            <TextView
+                android:id="@+id/menu_offline_batch"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="   PROCESS OFFLINE BATCH"
+                android:textColor="#FFE6EDF3"
+                android:textSize="13sp"
+                android:fontFamily="monospace"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#FF30363D" />
+
         </LinearLayout>
 
         <!-- Mode toggle — always visible in menu -->

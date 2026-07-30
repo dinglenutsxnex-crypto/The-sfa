@@ -119,6 +119,26 @@ object GameProtocolParser {
     }
 
     /**
+     * If [data] is a server-pushed process_offline_batch frame, returns Pair(counter, orderId).
+     * Returns null for any other command, partial frame, or parse failure.
+     *
+     * Server push structure (from server_process_offline_batch_74/76/77.bin captures):
+     *   field[1] = counter
+     *   field[2] = "process_offline_batch"
+     *   field[3] = { field[1] = orderId (varint) }
+     */
+    fun extractOfflineBatchPush(data: ByteArray): Pair<Long, Long>? {
+        val payload = extractPayload(data) ?: return null
+        val fields  = readProtoFields(payload)
+        val counter = (fields[1] as? Long)?.takeIf { it > 0 } ?: return null
+        val cmd     = (fields[2] as? ByteArray)?.toString(Charsets.UTF_8) ?: return null
+        if (cmd != "process_offline_batch") return null
+        val params  = fields[3] as? ByteArray ?: return null
+        val orderId = (readProtoFields(params)[1] as? Long)?.takeIf { it > 0 } ?: return null
+        return counter to orderId
+    }
+
+    /**
      * If [data] is a COMPLETE outbound event_battle_finish_fight SF3 frame, returns
      * Pair(battleId, counter) so TcpHandler can build a replacement WIN packet.
      * Returns null for any other command, partial frame, or parse failure.

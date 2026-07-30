@@ -83,7 +83,8 @@ class TrafficVpnService : VpnService() {
                 },
                 onWebSocket = { id -> viewModel.markAsWebSocket(id) },
                 onClanRounds = { rounds -> viewModel.setClanRounds(rounds) },
-                onBattleSeq = { seq -> viewModel.setBattleSeq(seq) }
+                onBattleSeq = { seq -> viewModel.setBattleSeq(seq) },
+                onOfflineBatch = { counter, orderId -> viewModel.setPendingOfflineBatch(counter, orderId) }
             )
 
             udpHandler = UdpHandler(
@@ -164,6 +165,32 @@ class TrafficVpnService : VpnService() {
      * This must be called from a background thread / IO coroutine; the write lock
      * may block briefly if writerLoop is mid-write.
      */
+    /**
+     * Builds and injects a process_offline_batch response using the last server push
+     * captured by sniffOfflineBatch. The counter mirrors the server's push exactly
+     * (verified from captures: client always uses the same counter, not +1).
+     *
+     * Uses order ID 1011 (from capture user_process_offline_batch_74.bin) as hardcoded
+     * fallback when no server push has been sniffed yet this session.
+     */
+    fun injectOfflineBatch(): String {
+        val handler = tcpHandler ?: return "FAIL: tcpHandler is null (VPN not running)"
+        val pending = AppState.viewModel.pendingOfflineBatch
+        val counter: Long
+        val orderId: Long
+        if (pending != null) {
+            counter = pending.counter
+            orderId = pending.orderId
+        } else {
+            // Fallback: use order 1011 with nextInjectCounter when no push has been seen.
+            // This covers the case where the server hasn't pushed yet this session.
+            counter = AppState.viewModel.nextInjectCounter
+            orderId = 1011L
+        }
+        val frame = com.nexora.hammerscale.net.PacketInjector.buildOfflineBatchResponse(counter, orderId)
+        return injectDirect(frame)
+    }
+
     fun injectDirect(data: ByteArray): String {
         val handler = tcpHandler ?: return "FAIL: tcpHandler is null (VPN not running)"
         val vm = AppState.viewModel

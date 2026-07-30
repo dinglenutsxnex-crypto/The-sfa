@@ -69,6 +69,18 @@ class ConnectionViewModel : ViewModel() {
     private val _sfaPort = java.util.concurrent.atomic.AtomicInteger(443)
     val sfaPort: Int get() = _sfaPort.get()
 
+    // Pending process_offline_batch: set when the server pushes one, consumed on inject.
+    data class PendingOfflineBatch(val counter: Long, val orderId: Long)
+    private val _pendingOfflineBatch = java.util.concurrent.atomic.AtomicReference<PendingOfflineBatch?>(null)
+
+    /** Called on the IO thread when a server process_offline_batch push is detected. */
+    fun setPendingOfflineBatch(counter: Long, orderId: Long) {
+        _pendingOfflineBatch.set(PendingOfflineBatch(counter, orderId))
+    }
+
+    /** Returns the last stored pending batch (keeps it — can be re-sent multiple times). */
+    val pendingOfflineBatch: PendingOfflineBatch? get() = _pendingOfflineBatch.get()
+
     /**
      * Set clan rounds directly from TCP handler (called synchronously on inbound frame).
      * This bypasses the async message queue to ensure rounds are set before any user action.

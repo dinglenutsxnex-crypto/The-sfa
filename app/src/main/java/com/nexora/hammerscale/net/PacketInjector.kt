@@ -644,6 +644,47 @@ object PacketInjector {
         }
     }
 
+    // ── process_offline_batch response ───────────────────────────────────
+
+    /**
+     * Builds a client-side process_offline_batch response packet.
+     *
+     * Wire structure verified from user_process_offline_batch_74/76/77.bin captures.
+     *
+     * Outer envelope:
+     *   field[1] = counter  ← MIRRORS the server's push counter exactly (not +1)
+     *   field[2] = "process_offline_batch"
+     *   field[3] = params_proto
+     *
+     * params_proto:
+     *   field[1] = accept_proto (bytes):
+     *     field[1] = orderId (varint)
+     *     field[2] = "accept_pending_order"
+     *     field[3] = gameVersion string (e.g. "1.9.80.35.26262-prod")
+     *     field[4] = inner_proto (bytes):
+     *       field[1] = orderId - 855  (constant delta confirmed across all 3 captures)
+     *
+     * @param counter  The counter value from the server's process_offline_batch push.
+     * @param orderId  The order ID from the server's params.field[1].
+     * @param gameVersion  Game version string from the original packet (default from captures).
+     */
+    fun buildOfflineBatchResponse(
+        counter: Long,
+        orderId: Long,
+        gameVersion: String = "1.9.80.35.26262-prod"
+    ): ByteArray {
+        val innerVal   = orderId - 855L
+        val innerProto = proto { varintField(1, innerVal) }
+        val acceptProto = proto {
+            varintField(1, orderId)
+            stringField(2, "accept_pending_order")
+            stringField(3, gameVersion)
+            bytesField(4, innerProto)
+        }
+        val params = proto { bytesField(1, acceptProto) }
+        return envelope("process_offline_batch", params, counter)
+    }
+
     /**
      * Raw deflate (no zlib header/trailer). Matches Python: zlib.compress(data, 6)[2:-4]
      * and is required for the SF3 large-packet (0x02) framing.

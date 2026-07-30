@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class OverlayService : Service() {
 
@@ -737,6 +738,22 @@ class OverlayService : Service() {
             menuPanel.visibility = View.GONE
             val msgs = AppState.viewModel.getAllMessages()
             LogDownloader.downloadAndShare(this, msgs)
+        }
+
+        // Process offline batch (SFA menu)
+        view.findViewById<TextView>(R.id.menu_offline_batch)?.setOnClickListener {
+            menuPanel.visibility = View.GONE
+            val vpn = TrafficVpnService.instance
+            if (vpn == null) {
+                android.widget.Toast.makeText(this, "VPN not running", android.widget.Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val result = vpn.injectOfflineBatch()
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(this@OverlayService, result, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         // Mode toggle
